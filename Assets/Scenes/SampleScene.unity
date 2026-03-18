@@ -201,7 +201,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 54612729}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: DeleteSelectedCounter
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &54612729
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -549,7 +561,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 226928810}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: MoveUp
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &226928810
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1111,6 +1135,7 @@ MonoBehaviour:
   counterListContainer: {fileID: 1363427069}
   counterListButtonPrefab: {fileID: 4560759950745363972, guid: 28169edd65b6e4a41861c72a0d1b5185, type: 3}
   counterNameInput: {fileID: 711258946}
+  moveStep: 0.02
 --- !u!4 &334014713
 Transform:
   m_ObjectHideFlags: 0
@@ -1806,7 +1831,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &615990543
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2908,7 +2933,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 821475284}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: OpenCounterMoveMenu
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &821475284
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3357,7 +3394,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 939915897}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: EditSelectedCounter
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &939915897
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5579,7 +5628,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1710679064}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: BackToCounterList
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1710679064
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5839,7 +5900,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1749019109}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: MoveDown
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1749019109
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6233,7 +6306,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1854312561
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6547,7 +6620,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2064204655}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: MoveLeft
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2064204655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7096,7 +7181,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2111573816}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 334014712}
+        m_TargetAssemblyTypeName: FlapjackA_NetworkManager, Assembly-CSharp
+        m_MethodName: MoveRight
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2111573816
 MonoBehaviour:
   m_ObjectHideFlags: 0

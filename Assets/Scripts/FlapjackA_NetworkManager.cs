@@ -443,7 +443,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
             statusText.text = status;
     }
 
-    //Counter Methods
+    //Menu Methods
     public void OpenCounterListMenu()
     {
         if (counterListPanel != null) counterListPanel.SetActive(true);
@@ -476,6 +476,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
     public void BackToCounterList()
     {
+        ClearSelectedCounter();
         OpenCounterListMenu();
     }
 
@@ -486,7 +487,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         if (counterMovePanel != null) counterMovePanel.SetActive(false);
         if (counterNamePanel != null) counterNamePanel.SetActive(false);
     }
-
+    //Counter Methods
     public void BeginAddCounter()
     {
         if (!IsReady)
@@ -533,6 +534,18 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         }, new string[] { "image/png" });
     }
 
+    public void SelectCounter(CounterData counter)
+    {
+        if (counter == null) return;
+
+        selectedCounter = counter;
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_select\",\"id\":\"{counter.id}\"}}"
+        );
+
+        OpenCounterActionMenu(counter);
+    }
     public void ConfirmCreateCounter()
     {
         if (!IsReady) return;
@@ -611,6 +624,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     }
 
     public void RefreshCounterListUI()
+
     {
         if (counterListContainer == null || counterListButtonPrefab == null) return;
 
@@ -633,11 +647,98 @@ public class FlapjackA_NetworkManager : MonoBehaviour
             if (btn != null)
             {
                 CounterData captured = counter;
-                btn.onClick.AddListener(() => OpenCounterActionMenu(captured));
+                btn.onClick.AddListener(() => SelectCounter(captured));
             }
         }
     }
 
+    public void ClearSelectedCounter()
+    {
+        selectedCounter = null;
+        SendLineSafe("{\"type\":\"counter_select\",\"id\":\"\"}");
+    }
+
+    [SerializeField] private float moveStep = 0.02f;
+
+    //Move Counter Methods
+    public void MoveUp()
+    {
+        MoveSelectedBy(0f, moveStep);
+    }
+
+    public void MoveDown()
+    {
+        MoveSelectedBy(0f, -moveStep);
+    }
+
+    public void MoveLeft()
+    {
+        MoveSelectedBy(-moveStep, 0f);
+    }
+
+    public void MoveRight()
+    {
+        MoveSelectedBy(moveStep, 0f);
+    }
+
+    public void MoveSelectedBy(float dx, float dy)
+    {
+        if (selectedCounter == null) return;
+
+        selectedCounter.x = Mathf.Clamp01(selectedCounter.x + dx);
+        selectedCounter.y = Mathf.Clamp01(selectedCounter.y + dy);
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_move\",\"id\":\"{selectedCounter.id}\",\"x\":{selectedCounter.x},\"y\":{selectedCounter.y}}}"
+        );
+    }
+    //Delete Counter Method
+    public void DeleteSelectedCounter()
+    {
+        if (selectedCounter == null) return;
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_delete\",\"id\":\"{selectedCounter.id}\"}}"
+        );
+
+        counters.Remove(selectedCounter);
+        selectedCounter = null;
+
+        RefreshCounterListUI();
+        OpenCounterListMenu();
+    }
+
+    //Edit Counter Method
+    public void EditSelectedCounter()
+    {
+        if (selectedCounter == null) return;
+
+        NativeFilePicker.PickFile((path) =>
+        {
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            try
+            {
+                byte[] pngBytes = System.IO.File.ReadAllBytes(path);
+
+                SendCounterPngBytesWithId(
+                    selectedCounter.id,
+                    pngBytes,
+                    selectedCounter.x,
+                    selectedCounter.y,
+                    0.10f
+                );
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError(e);
+            }
+
+        }, new string[] { "image/png" });
+
+    }
+    //misc
     public string SafePassword()
     {
         // Never crash if passwordInput isn't wired
