@@ -113,12 +113,33 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
     private byte[] pendingCounterImageBytes;
 
+    // Dice data
+
+    [Header("Dice Counts")]
+    private int pendingD4 = 0;
+    private int pendingD6 = 0;
+    private int pendingD8 = 0;
+    private int pendingD10 = 0;
+    private int pendingD12 = 0;
+    private int pendingD20 = 0;
+    [Header("Dice UI")]
+    public TMPro.TMP_Text diceSelectionText;
+    public GameObject rollDiceButton;
+    public GameObject clearDiceButton;
+    private int ReadDieCount(TMP_InputField input)
+    {
+        if (input == null) return 0;
+        if (int.TryParse(input.text.Trim(), out int value))
+            return Mathf.Max(0, value);
+        return 0;
+    }
     void Start()
     {
         SetState(AppState.Login, "Enter pairing code and connect.");
 
         retryButton.onClick.AddListener(RetryDiscovery);
 
+        RefreshDiceUI();
         RetryDiscovery();
     }
 
@@ -368,43 +389,125 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         tcp = null;
     }
 
-
+    //Playmat code
     public void SendTestPlaymat()
+    {
+        if (!IsReady || testPlaymat == null) return;
+
+        byte[] png = testPlaymat.EncodeToPNG();
+        SendPlaymatBytes(png);
+    }
+    public void PickAndSendPlaymat()
     {
         if (!IsReady)
         {
-            Debug.LogWarning("Not ready (not connected/authenticated).");
-            return;
-        }
-        if (testPlaymat == null)
-        {
-            Debug.LogError("testPlaymat not assigned.");
+            Debug.LogWarning("Not ready (connect + auth first).");
             return;
         }
 
-        try
+        if (!NativeFilePicker.CheckPermission())
         {
-            byte[] png = testPlaymat.EncodeToPNG();
-            string header = $"{{\"type\":\"playmat_begin\",\"size\":{png.Length}}}";
+            Debug.LogError("Storage permission not granted.");
+            return;
+        }
 
-            // Header line
-            SendLineSafe(header);
-
-            // Raw bytes (binary) — must write directly, not as line
-            lock (sendLock)
+        NativeFilePicker.PickFile((path) =>
+        {
+            if (string.IsNullOrEmpty(path))
             {
-                stream.Write(png, 0, png.Length);
+                Debug.Log("User cancelled playmat pick.");
+                return;
             }
 
-            Debug.Log($"✅ Sent playmat bytes: {png.Length}");
-        }
-        catch (Exception e)
+            try
+            {
+                byte[] fileBytes = File.ReadAllBytes(path);
+
+                // For now, assume image file
+                SendPlaymatBytes(fileBytes);
+
+                Debug.Log("Picked and sent playmat: " + path);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("Failed to read playmat file: " + e);
+            }
+
+        }, new string[] { "image/png", "image/jpeg" });
+    }
+    public void SendPlaymatBytes(byte[] imageBytes)
+    {
+        if (!IsReady || imageBytes == null || imageBytes.Length == 0) return;
+
+        string header = $"{{\"type\":\"playmat_begin\",\"size\":{imageBytes.Length}}}";
+        SendLineSafe(header);
+
+        lock (sendLock)
         {
-            Debug.LogError("SendTestPlaymat failed: " + e);
-            DisconnectInternal();
+            stream.Write(imageBytes, 0, imageBytes.Length);
         }
+
+        Debug.Log($"✅ Sent playmat bytes={imageBytes.Length}");
     }
 
+    //dice code
+    public void AddD4() { pendingD4++; RefreshDiceUI(); }
+    public void AddD6() { pendingD6++; RefreshDiceUI(); }
+    public void AddD8() { pendingD8++; RefreshDiceUI(); }
+    public void AddD10() { pendingD10++; RefreshDiceUI(); }
+    public void AddD12() { pendingD12++; RefreshDiceUI(); }
+    public void AddD20() { pendingD20++; RefreshDiceUI(); }
+
+    public void RefreshDiceUI()
+    {
+        if (diceSelectionText != null)
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+            if (pendingD4 > 0) sb.AppendLine($"d4 x{pendingD4}");
+            if (pendingD6 > 0) sb.AppendLine($"d6 x{pendingD6}");
+            if (pendingD8 > 0) sb.AppendLine($"d8 x{pendingD8}");
+            if (pendingD10 > 0) sb.AppendLine($"d10 x{pendingD10}");
+            if (pendingD12 > 0) sb.AppendLine($"d12 x{pendingD12}");
+            if (pendingD20 > 0) sb.AppendLine($"d20 x{pendingD20}");
+
+            if (sb.Length == 0)
+                sb.Append("No dice selected");
+
+            diceSelectionText.text = sb.ToString();
+        }
+
+        bool hasDice = (pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20) > 0;
+
+        if (rollDiceButton != null) rollDiceButton.SetActive(hasDice);
+        if (clearDiceButton != null) clearDiceButton.SetActive(hasDice);
+    }
+    public void RollDice()
+    {
+        if (!IsReady) return;
+
+        int total = pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20;
+        if (total <= 0) return;
+
+        SendLineSafe(
+            $"{{\"type\":\"roll_dice\",\"d4\":{pendingD4},\"d6\":{pendingD6},\"d8\":{pendingD8},\"d10\":{pendingD10},\"d12\":{pendingD12},\"d20\":{pendingD20}}}"
+        );
+    }
+    public void ClearDice()
+    {
+        pendingD4 = 0;
+        pendingD6 = 0;
+        pendingD8 = 0;
+        pendingD10 = 0;
+        pendingD12 = 0;
+        pendingD20 = 0;
+
+        RefreshDiceUI();
+
+        if (IsReady)
+            SendLineSafe("{\"type\":\"clear_dice\"}");
+    }
+    //disconnect
     public void Disconnect()
     {
         DisconnectInternal();
