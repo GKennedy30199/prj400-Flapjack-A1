@@ -17,6 +17,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 {
     private readonly Queue<Action> _mainThread = new Queue<Action>();
 
+
     private void RunOnMainThread(Action a)
     {
         lock (_mainThread) _mainThread.Enqueue(a);
@@ -336,6 +337,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         {
             authenticated = true;
             SetState(AppState.Ready, "Connected ✅");
+            RequestFullState();
             return;
         }
 
@@ -346,7 +348,14 @@ public class FlapjackA_NetworkManager : MonoBehaviour
             DisconnectInternal();
             return;
         }
+        if (line.Contains("\"type\":\"full_state\""))
+        {
+            string stateJsonEscaped = ExtractString(line, "state");
+            string stateJson = UnescapeJsonString(stateJsonEscaped);
 
+            HandleFullState(stateJson);
+            return;
+        }
         if (line.Contains("not_authenticated"))
         {
             Debug.LogWarning("Server says not_authenticated. Resending auth...");
@@ -681,7 +690,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         counters.Add(newCounter);
         selectedCounter = newCounter;
 
-        SendCounterPngBytesWithId(id, pendingCounterImageBytes, newCounter.x, newCounter.y, 0.10f);
+        SendCounterPngBytesWithId(id, newCounter.displayName, pendingCounterImageBytes, newCounter.x, newCounter.y, 0.10f);
 
         pendingCounterImageBytes = null;
 
@@ -700,12 +709,14 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
         OpenCounterListMenu();
     }
-    public void SendCounterPngBytesWithId(string id, byte[] pngBytes, float x = 0.5f, float y = 0.5f, float size = 0.10f)
+    public void SendCounterPngBytesWithId(string id, string displayName, byte[] pngBytes, float x = 0.5f, float y = 0.5f, float size = 0.10f)
     {
         if (!IsReady || pngBytes == null || pngBytes.Length == 0) return;
 
+        string safeName = EscapeJson(displayName ?? "");
+
         string header =
-            $"{{\"type\":\"counter_begin\",\"id\":\"{id}\",\"x\":{x},\"y\":{y},\"size\":{size},\"bytes\":{pngBytes.Length}}}";
+            $"{{\"type\":\"counter_begin\",\"id\":\"{id}\",\"name\":\"{safeName}\",\"x\":{x},\"y\":{y},\"size\":{size},\"bytes\":{pngBytes.Length}}}";
 
         SendLineSafe(header);
 
@@ -714,7 +725,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
             stream.Write(pngBytes, 0, pngBytes.Length);
         }
 
-        Debug.Log($"✅ Sent counter {id} bytes={pngBytes.Length}");
+        Debug.Log($"✅ Sent counter {id} ({displayName}) bytes={pngBytes.Length}");
     }
     public void SendCounterPngBytes(byte[] pngBytes, float x = 0.5f, float y = 0.5f, float size = 0.10f)
     {
@@ -723,7 +734,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         counterIndex++;
         string id = $"c{counterIndex}";
 
-        SendCounterPngBytesWithId(id, pngBytes, x, y, size);
+        SendCounterPngBytesWithId(id, id, pngBytes, x, y, size);
     }
 
     public void RefreshCounterListUI()
@@ -826,11 +837,12 @@ public class FlapjackA_NetworkManager : MonoBehaviour
                 byte[] pngBytes = System.IO.File.ReadAllBytes(path);
 
                 SendCounterPngBytesWithId(
-                    selectedCounter.id,
-                    pngBytes,
-                    selectedCounter.x,
-                    selectedCounter.y,
-                    0.10f
+                 selectedCounter.id,
+                 selectedCounter.displayName,
+                 pngBytes,
+                 selectedCounter.x,
+                 selectedCounter.y,
+                  0.10f
                 );
             }
             catch (System.Exception e)
@@ -840,6 +852,30 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
         }, new string[] { "image/png" });
 
+    }
+
+    //Resize Counter Method
+    [SerializeField] private float resizeStep = 0.02f;
+
+    public void IncreaseSelectedCounterSize()
+    {
+        ResizeSelectedCounterBy(resizeStep);
+    }
+
+    public void DecreaseSelectedCounterSize()
+    {
+        ResizeSelectedCounterBy(-resizeStep);
+    }
+
+    public void ResizeSelectedCounterBy(float delta)
+    {
+        if (selectedCounter == null) return;
+
+        selectedCounter.size = Mathf.Clamp(selectedCounter.size + delta, 0.02f, 0.5f);
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_resize\",\"id\":\"{selectedCounter.id}\",\"size\":{selectedCounter.size.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}"
+        );
     }
     //misc
     public string SafePassword()
@@ -860,6 +896,106 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         // DisconnectInternal will push you back to Login state
     }
 
+    public void DuplicateSelectedCounter()
+    {
+        if (selectedCounter == null) return;
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_duplicate\",\"id\":\"{selectedCounter.id}\"}}"
+        );
+
+        // Best to let sync repopulate A correctly afterward
+        RequestFullState();
+    }
+    public void ToggleSelectedCounterLock()
+    {
+        if (selectedCounter == null) return;
+
+        selectedCounter.isLocked = !selectedCounter.isLocked;
+        int lockedValue = selectedCounter.isLocked ? 1 : 0;
+
+        SendLineSafe(
+            $"{{\"type\":\"counter_lock\",\"id\":\"{selectedCounter.id}\",\"locked\":{lockedValue}}}"
+        );
+    }
+
+    private void HandleFullState(string stateJson)
+    {
+        try
+        {
+            BoardState boardState = JsonUtility.FromJson<BoardState>(stateJson);
+
+            if (boardState == null)
+            {
+                Debug.LogError("HandleFullState: boardState is NULL");
+                return;
+            }
+
+            RunOnMainThread(() =>
+            {
+                counters.Clear();
+                selectedCounter = null;
+
+                if (boardState.counters != null)
+                {
+                    foreach (var remoteCounter in boardState.counters)
+                    {
+                        if (remoteCounter == null) continue;
+
+                        CounterData localCounter = new CounterData
+                        {
+                            id = remoteCounter.id,
+                            displayName = string.IsNullOrWhiteSpace(remoteCounter.displayName) ? remoteCounter.id : remoteCounter.displayName,
+                            x = remoteCounter.x,
+                            y = remoteCounter.y,
+                            size = remoteCounter.size,
+                            isLocked = remoteCounter.isLocked
+                        };
+
+                        counters.Add(localCounter);
+
+                        if (!string.IsNullOrEmpty(boardState.selectedCounterId) &&
+                            remoteCounter.id == boardState.selectedCounterId)
+                        {
+                            selectedCounter = localCounter;
+                        }
+                    }
+                }
+
+                RefreshCounterListUI();
+
+                Debug.Log($"✅ Full state applied on A. Counters={counters.Count}, selected={boardState.selectedCounterId}");
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("HandleFullState exception: " + e);
+        }
+    }
+    private string ExtractString(string json, string key)
+    {
+        string pattern = $"\"{key}\":\"";
+        int start = json.IndexOf(pattern, StringComparison.Ordinal);
+        if (start < 0) return "";
+
+        start += pattern.Length;
+        int end = json.IndexOf("\"", start);
+        if (end < 0) return "";
+
+        return json.Substring(start, end - start);
+    }
+    private string UnescapeJsonString(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        return s.Replace("\\\"", "\"").Replace("\\\\", "\\");
+    }
+    public void RequestFullState()
+    {
+        if (!IsReady) return;
+
+        SendLineSafe("{\"type\":\"request_full_state\"}");
+        Debug.Log("➡️ Requested full state from B");
+    }
 
 }
 public static class NetUtil
