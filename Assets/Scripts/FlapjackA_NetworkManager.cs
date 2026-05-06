@@ -57,11 +57,11 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     
     public bool IsReady => connected && authenticated;
 
-    [SerializeField] private bool editorForceLocalhost = true;
+    [SerializeField] private bool editorForceLocalhost = false;
 
     [SerializeField] private GameObject loginPanel;
     [SerializeField] private GameObject menuPanel;
-
+    [SerializeField] private GameObject dicepanel;
     [SerializeField] private TMPro.TMP_Text statusText;
 
     // track state
@@ -117,6 +117,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     // Dice data
 
     [Header("Dice Counts")]
+    private int pendingCoin = 0;
     private int pendingD4 = 0;
     private int pendingD6 = 0;
     private int pendingD8 = 0;
@@ -285,8 +286,8 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     private void ConnectToResolvedTarget(string ip, int port)
     {
 #if UNITY_EDITOR
-    Debug.Log("EDITOR: forcing localhost");
-    ip = "127.0.0.1";
+   // Debug.Log("EDITOR: forcing localhost");
+    //ip = "127.0.0.1";
 #endif
         ConnectTcp(ip, port);
     }
@@ -460,6 +461,8 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     }
 
     //dice code
+
+    public void AddCoin() { pendingCoin++; RefreshDiceUI(); }
     public void AddD4() { pendingD4++; RefreshDiceUI(); }
     public void AddD6() { pendingD6++; RefreshDiceUI(); }
     public void AddD8() { pendingD8++; RefreshDiceUI(); }
@@ -472,7 +475,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         if (diceSelectionText != null)
         {
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
-
+            if (pendingCoin > 0) sb.AppendLine($"Coin x{pendingCoin}");
             if (pendingD4 > 0) sb.AppendLine($"d4 x{pendingD4}");
             if (pendingD6 > 0) sb.AppendLine($"d6 x{pendingD6}");
             if (pendingD8 > 0) sb.AppendLine($"d8 x{pendingD8}");
@@ -486,7 +489,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
             diceSelectionText.text = sb.ToString();
         }
 
-        bool hasDice = (pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20) > 0;
+        bool hasDice = (pendingCoin + pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20) > 0;
 
         if (rollDiceButton != null) rollDiceButton.SetActive(hasDice);
         if (clearDiceButton != null) clearDiceButton.SetActive(hasDice);
@@ -495,15 +498,16 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     {
         if (!IsReady) return;
 
-        int total = pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20;
+        int total = pendingCoin + pendingD4 + pendingD6 + pendingD8 + pendingD10 + pendingD12 + pendingD20;
         if (total <= 0) return;
 
         SendLineSafe(
-            $"{{\"type\":\"roll_dice\",\"d4\":{pendingD4},\"d6\":{pendingD6},\"d8\":{pendingD8},\"d10\":{pendingD10},\"d12\":{pendingD12},\"d20\":{pendingD20}}}"
+            $"{{\"type\":\"roll_dice\",\"coin\":{pendingCoin},\"d4\":{pendingD4},\"d6\":{pendingD6},\"d8\":{pendingD8},\"d10\":{pendingD10},\"d12\":{pendingD12},\"d20\":{pendingD20}}}"
         );
     }
     public void ClearDice()
     {
+        pendingCoin = 0;
         pendingD4 = 0;
         pendingD6 = 0;
         pendingD8 = 0;
@@ -588,16 +592,31 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
     public void BackToCounterList()
     {
-        ClearSelectedCounter();
-        OpenCounterListMenu();
+        if (counterListPanel != null) counterListPanel.SetActive(true);
+        if (counterActionPanel != null) counterActionPanel.SetActive(false);
+        if (counterMovePanel != null) counterMovePanel.SetActive(false);
+        if (counterNamePanel != null) counterNamePanel.SetActive(false);
+        if (menuPanel != null) menuPanel.SetActive(false);
+        
     }
-
+     
+   public void BackToCounterAction()
+    {
+        if (counterListPanel != null) counterListPanel.SetActive(false);
+        if (counterActionPanel != null) counterActionPanel.SetActive(true);
+        if (counterMovePanel != null) counterMovePanel.SetActive(false);
+        if (counterNamePanel != null) counterNamePanel.SetActive(false);
+        if (menuPanel != null) menuPanel.SetActive(false);
+    }
     public void BackToMainMenu()
     {
+       
         if (counterListPanel != null) counterListPanel.SetActive(false);
         if (counterActionPanel != null) counterActionPanel.SetActive(false);
         if (counterMovePanel != null) counterMovePanel.SetActive(false);
         if (counterNamePanel != null) counterNamePanel.SetActive(false);
+        if (dicepanel != null) dicepanel.SetActive(false);
+        if (menuPanel != null) menuPanel.SetActive(true);
     }
     //Counter Methods
     public void BeginAddCounter()
@@ -772,7 +791,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         SendLineSafe("{\"type\":\"counter_select\",\"id\":\"\"}");
     }
 
-    [SerializeField] private float moveStep = 0.02f;
+    [SerializeField] private float moveStep = 0.10f;
 
     //Move Counter Methods
     public void MoveUp()
