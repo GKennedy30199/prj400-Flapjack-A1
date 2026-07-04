@@ -34,7 +34,14 @@ public class FlapjackA_NetworkManager : MonoBehaviour
 
     [Header("Auth UI")]
     public TMP_InputField passwordInput;
-   
+
+    [Header("Premade Setup UI")]
+    private string selectedPremadeGame = "";
+    private int selectedPlayerCount = 2;
+    //GameIDS:
+    private const string GAME_SNAKES = "snakes_ladders";
+
+    private int snakesSelectedPlayerCount = 0;
 
     private TcpClient tcp;
     private NetworkStream stream;
@@ -63,6 +70,9 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     [SerializeField] private GameObject menuPanel;
     [SerializeField] private GameObject dicepanel;
     [SerializeField] private TMPro.TMP_Text statusText;
+
+    [Header("Premade Games UI")]
+    public GameObject premadeGamesPanel;
 
     // track state
     private volatile AppState state = AppState.Login;
@@ -111,9 +121,19 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     public Transform counterListContainer;
     public GameObject counterListButtonPrefab;
     public TMP_InputField counterNameInput;
-
+    public GameObject playerSetupPanel;
     private byte[] pendingCounterImageBytes;
 
+
+    //Set player count for premade game
+    public void SetPlayerCount(int count)
+    {
+        selectedPlayerCount = Mathf.Clamp(count, 2, 4);
+        if (selectedPremadeGame == GAME_SNAKES)
+        {
+            snakesSelectedPlayerCount = selectedPlayerCount;
+        }
+    }
     // Dice data
 
     [Header("Dice Counts")]
@@ -560,6 +580,25 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     }
 
     //Menu Methods
+    public void OpenPremadeGamesMenu()
+    {
+        if (menuPanel != null) menuPanel.SetActive(false);
+
+        if (counterListPanel != null) counterListPanel.SetActive(false);
+        if (counterActionPanel != null) counterActionPanel.SetActive(false);
+        if (counterMovePanel != null) counterMovePanel.SetActive(false);
+        if (counterNamePanel != null) counterNamePanel.SetActive(false);
+
+        if (premadeGamesPanel != null) premadeGamesPanel.SetActive(true);
+    }
+
+    public void ClosePremadeGamesMenu()
+    {
+        if (premadeGamesPanel != null) premadeGamesPanel.SetActive(false);
+        if (menuPanel != null) menuPanel.SetActive(true);
+    }
+
+
     public void OpenCounterListMenu()
     {
         if (counterListPanel != null) counterListPanel.SetActive(true);
@@ -895,6 +934,21 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         SendLineSafe(
             $"{{\"type\":\"counter_resize\",\"id\":\"{selectedCounter.id}\",\"size\":{selectedCounter.size.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}"
         );
+    }
+
+    //Snakes and ladders method
+    public void SelectPremadeGame_SnakesAndLadders()
+    {
+        selectedPremadeGame = "snakes_ladders";
+
+        SendLineSafe("{\"type\":\"premade_select_game\",\"game\":\"snakes_ladders\"}");
+
+        if (premadeGamesPanel != null) premadeGamesPanel.SetActive(false);
+        if (playerSetupPanel != null) playerSetupPanel.SetActive(true);
+
+        SetPlayerCount(2);
+
+        Debug.Log("Selected premade game: Snakes and Ladders");
     }
     //misc
     public string SafePassword()
