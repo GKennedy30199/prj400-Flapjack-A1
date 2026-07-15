@@ -30,13 +30,13 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         Ready         // authenticated
     }
 
-    
+
 
     [Header("Auth UI")]
     public TMP_InputField passwordInput;
 
     [Header("Premade Setup UI")]
-    private string selectedPremadeGame = "";
+    // private string selectedPremadeGame = "";
     private int selectedPlayerCount = 2;
     //GameIDS:
     private const string GAME_SNAKES = "snakes_ladders";
@@ -46,7 +46,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     private TcpClient tcp;
     private NetworkStream stream;
     private Thread tcpReadThread;
-    
+
 
     private volatile bool connected;       // TCP socket is connected
     private volatile bool authenticated;   // server accepted auth
@@ -54,14 +54,14 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     private volatile bool hasPendingState;
     private AppState pendingState;
     private string pendingStatus;
- 
+
 
     private readonly object sendLock = new object();
 
     public bool IsConnected => connected;
     public bool IsAuthenticated => authenticated;
 
-    
+
     public bool IsReady => connected && authenticated;
 
     [SerializeField] private bool editorForceLocalhost = false;
@@ -74,6 +74,9 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     [Header("Premade Games UI")]
     public GameObject premadeGamesPanel;
 
+    [Header("Snakes Controller UI")]
+    public GameObject snakesControllerPanel;
+
     // track state
     private volatile AppState state = AppState.Login;
     public AppState State => state;
@@ -83,7 +86,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     public Texture2D testPlaymat;
 
     //public InputField passwordInput;
-   // private volatile bool authenticated;
+    // private volatile bool authenticated;
 
     [Header("Ports")]
     public int udpPort = 47777;
@@ -101,11 +104,35 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     //private volatile bool connected;
 
     private string connectedIp;
-   // private TcpClient tcp;
-   // private NetworkStream stream;
+    // private TcpClient tcp;
+    // private NetworkStream stream;
 
     private Thread discoverThread;
     // private Thread tcpReadThread;
+
+    //Player set up
+    [Header("Universal Player Setup")]
+    public GameObject playerSetupPanel;
+    public TMP_Text playerSetupTitleText;
+    public TMP_Text playerSetupErrorText;
+
+    public GameObject beginGameButton;
+
+    public GameObject[] playerRows = new GameObject[4];
+    public TMP_InputField[] playerNameInputs = new TMP_InputField[4];
+    public Button[] playerColourButtons = new Button[4];
+
+    [Header("Colour Picker")]
+    public GameObject colourPickerPanel;
+
+    private string selectedPremadeGame = "";
+    private int selectedPremadePlayerCount = 0;
+    private int playerBeingColoured = -1;
+
+    private string[] playerColours = new string[4]
+    {
+    "red", "blue", "green", "yellow"
+    };
 
 
     //Counters data
@@ -121,7 +148,6 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     public Transform counterListContainer;
     public GameObject counterListButtonPrefab;
     public TMP_InputField counterNameInput;
-    public GameObject playerSetupPanel;
     private byte[] pendingCounterImageBytes;
 
 
@@ -187,7 +213,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         if (ran > 0) Debug.Log("UI actions ran: " + ran);
     }
 
-
+    #region PreRepeats
     public void RetryDiscovery()
     {
         SetState(AppState.Connecting, "Searching for Flapjack B...");
@@ -636,10 +662,10 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         if (counterMovePanel != null) counterMovePanel.SetActive(false);
         if (counterNamePanel != null) counterNamePanel.SetActive(false);
         if (menuPanel != null) menuPanel.SetActive(false);
-        
+
     }
-     
-   public void BackToCounterAction()
+
+    public void BackToCounterAction()
     {
         if (counterListPanel != null) counterListPanel.SetActive(false);
         if (counterActionPanel != null) counterActionPanel.SetActive(true);
@@ -649,7 +675,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
     }
     public void BackToMainMenu()
     {
-       
+
         if (counterListPanel != null) counterListPanel.SetActive(false);
         if (counterActionPanel != null) counterActionPanel.SetActive(false);
         if (counterMovePanel != null) counterMovePanel.SetActive(false);
@@ -936,20 +962,7 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         );
     }
 
-    //Snakes and ladders method
-    public void SelectPremadeGame_SnakesAndLadders()
-    {
-        selectedPremadeGame = "snakes_ladders";
 
-        SendLineSafe("{\"type\":\"premade_select_game\",\"game\":\"snakes_ladders\"}");
-
-        if (premadeGamesPanel != null) premadeGamesPanel.SetActive(false);
-        if (playerSetupPanel != null) playerSetupPanel.SetActive(true);
-
-        SetPlayerCount(2);
-
-        Debug.Log("Selected premade game: Snakes and Ladders");
-    }
     //misc
     public string SafePassword()
     {
@@ -1069,7 +1082,272 @@ public class FlapjackA_NetworkManager : MonoBehaviour
         SendLineSafe("{\"type\":\"request_full_state\"}");
         Debug.Log("➡️ Requested full state from B");
     }
+    #endregion
+    #region Repeats
+    //reset player setup UI
+    private void ResetPlayerSetupUI()
+    {
+        selectedPremadePlayerCount = 0;
+        playerBeingColoured = -1;
 
+        if (beginGameButton != null)
+            beginGameButton.SetActive(false);
+
+        if (colourPickerPanel != null)
+            colourPickerPanel.SetActive(false);
+
+        if (playerSetupErrorText != null)
+            playerSetupErrorText.text = "";
+
+        for (int i = 0; i < playerRows.Length; i++)
+        {
+            if (playerRows[i] != null)
+                playerRows[i].SetActive(false);
+
+            if (playerNameInputs[i] != null)
+                playerNameInputs[i].text = $"Player {i + 1}";
+
+            playerColours[i] = i switch
+            {
+                0 => "red",
+                1 => "blue",
+                2 => "green",
+                3 => "yellow",
+                _ => "red"
+            };
+
+            UpdatePlayerColourButtonVisual(i);
+        }
+    }
+    //player count buttons
+    public void SetPremadePlayerCount(int count)
+    {
+        selectedPremadePlayerCount = Mathf.Clamp(count, 2, 4);
+
+        for (int i = 0; i < playerRows.Length; i++)
+        {
+            if (playerRows[i] != null)
+                playerRows[i].SetActive(i < selectedPremadePlayerCount);
+        }
+
+        if (beginGameButton != null)
+            beginGameButton.SetActive(true);
+
+        if (playerSetupErrorText != null)
+            playerSetupErrorText.text = "";
+
+        Debug.Log("Player count selected: " + selectedPremadePlayerCount);
+    }
+    //colour button logic
+    public void OpenColourPickerForPlayer(int playerIndex)
+    {
+        playerBeingColoured = playerIndex;
+
+        if (colourPickerPanel != null)
+            colourPickerPanel.SetActive(true);
+
+        Debug.Log("Choosing colour for player " + (playerIndex + 1));
+    }
+    private void UpdatePlayerColourButtonVisual(int index)
+    {
+        if (playerColourButtons == null || index < 0 || index >= playerColourButtons.Length)
+            return;
+
+        Button button = playerColourButtons[index];
+
+        if (button == null)
+            return;
+
+        Image buttonImage = button.GetComponent<Image>();
+
+        if (buttonImage != null)
+            buttonImage.color = ColourNameToUnityColour(playerColours[index]);
+
+        TMP_Text buttonText = button.GetComponentInChildren<TMP_Text>();
+
+        if (buttonText != null)
+            buttonText.text = playerColours[index].ToUpperInvariant();
+    }
+
+    private Color ColourNameToUnityColour(string colourName)
+    {
+        switch (colourName)
+        {
+            case "red":
+                return Color.red;
+
+            case "blue":
+                return Color.blue;
+
+            case "green":
+                return Color.green;
+
+            case "yellow":
+                return Color.yellow;
+
+            default:
+                return Color.white;
+        }
+    }
+    public void PickRedColour()
+    {
+        PickPlayerColour("red");
+    }
+
+    public void PickBlueColour()
+    {
+        PickPlayerColour("blue");
+    }
+
+    public void PickGreenColour()
+    {
+        PickPlayerColour("green");
+    }
+
+    public void PickYellowColour()
+    {
+        PickPlayerColour("yellow");
+    }
+
+    private void PickPlayerColour(string colourName)
+    {
+        if (playerBeingColoured < 0 || playerBeingColoured >= playerColours.Length)
+            return;
+
+        playerColours[playerBeingColoured] = colourName.ToLowerInvariant();
+
+        UpdatePlayerColourButtonVisual(playerBeingColoured);
+
+        if (colourPickerPanel != null)
+            colourPickerPanel.SetActive(false);
+
+        if (playerSetupErrorText != null)
+            playerSetupErrorText.text = "";
+
+        Debug.Log($"Player {playerBeingColoured + 1} colour set to {colourName}");
+    }
+    private void ShowPlayerSetupError(string message)
+    {
+        if (playerSetupErrorText != null)
+            playerSetupErrorText.text = message;
+
+        Debug.LogWarning(message);
+    }
+    //Cancel
+    public void CancelPremadeSetup()
+    {
+        SendLineSafe("{\"type\":\"premade_cancel_game\"}");
+
+        selectedPremadeGame = "";
+        selectedPremadePlayerCount = 0;
+
+        if (playerSetupPanel != null)
+            playerSetupPanel.SetActive(false);
+
+        if (colourPickerPanel != null)
+            colourPickerPanel.SetActive(false);
+
+        if (premadeGamesPanel != null)
+            premadeGamesPanel.SetActive(true);
+
+        Debug.Log("Premade setup cancelled.");
+    }
+    //Begin
+    public void BeginPremadeGame()
+    {
+        if (selectedPremadePlayerCount < 2)
+        {
+            ShowPlayerSetupError("Pick 2, 3, or 4 players first.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(selectedPremadeGame))
+        {
+            ShowPlayerSetupError("No game selected.");
+            return;
+        }
+
+        HashSet<string> usedColours = new HashSet<string>();
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.Append("{");
+        sb.Append("\"type\":\"premade_start_game\",");
+        sb.Append($"\"game\":\"{EscapeJson(selectedPremadeGame)}\",");
+        sb.Append($"\"playerCount\":{selectedPremadePlayerCount}");
+
+        for (int i = 0; i < selectedPremadePlayerCount; i++)
+        {
+            string playerName = playerNameInputs[i] != null
+                ? playerNameInputs[i].text.Trim()
+                : "";
+
+            if (string.IsNullOrWhiteSpace(playerName))
+            {
+                ShowPlayerSetupError($"Player {i + 1} needs a name.");
+                return;
+            }
+
+            string colour = playerColours[i];
+
+            if (usedColours.Contains(colour))
+            {
+                ShowPlayerSetupError("Players cannot use the same colour.");
+                return;
+            }
+
+            usedColours.Add(colour);
+
+            int playerNumber = i + 1;
+
+            sb.Append($",\"p{playerNumber}Name\":\"{EscapeJson(playerName)}\"");
+            sb.Append($",\"p{playerNumber}Colour\":\"{EscapeJson(colour)}\"");
+        }
+
+        sb.Append("}");
+
+        string message = sb.ToString();
+
+        SendLineSafe(message);
+        if (playerSetupPanel != null)
+            playerSetupPanel.SetActive(false);
+
+        if (snakesControllerPanel != null)
+            snakesControllerPanel.SetActive(true);
+
+        if (playerSetupErrorText != null)
+            playerSetupErrorText.text = "";
+
+        Debug.Log("Begin game sent: " + message);
+    }
+    //Snakes and ladders method
+    public void SelectPremadeGame_SnakesAndLadders()
+    {
+        selectedPremadeGame = "snakes_ladders";
+
+        SendLineSafe("{\"type\":\"premade_select_game\",\"game\":\"snakes_ladders\"}");
+
+        if (premadeGamesPanel != null)
+            premadeGamesPanel.SetActive(false);
+
+        if (playerSetupPanel != null)
+            playerSetupPanel.SetActive(true);
+
+        if (playerSetupTitleText != null)
+            playerSetupTitleText.text = "Snakes and Ladders";
+
+        ResetPlayerSetupUI();
+
+        Debug.Log("Snakes and Ladders selected.");
+    }
+    #endregion
+
+
+    public void RollSnakesD6()
+    {
+        SendLineSafe("{\"type\":\"snakes_roll\"}");
+        Debug.Log("Sent snakes_roll to B.");
+    }
 }
 public static class NetUtil
 {
